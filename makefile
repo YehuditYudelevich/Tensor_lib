@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic
 TARGET = test_tensor.exe
-OBJS = tensor.o tensor_view.o tensor_broadcast.o utils.o test_tensor.o
+OBJS = tensor.o tensor_view.o tensor_broadcast.o tensor_ops.o utils.o test_tensor.o
 
 .PHONY: all test clean
 
@@ -22,10 +22,13 @@ tensor_view.o: tensor_view.c tensor_view.h tensor_internal.h tensor.h utils.h er
 tensor_broadcast.o: tensor_broadcast.c tensor_broadcast.h tensor.h error_handle.h
 	$(CC) $(CFLAGS) -c tensor_broadcast.c -o tensor_broadcast.o
 
+tensor_ops.o: tensor_ops.c tensor_ops.h tensor_broadcast.h tensor.h error_handle.h
+	$(CC) $(CFLAGS) -c tensor_ops.c -o tensor_ops.o
+
 utils.o: utils.c utils.h
 	$(CC) $(CFLAGS) -c utils.c -o utils.o
 
-test_tensor.o: test_tensor.c tensor.h tensor_view.h tensor_broadcast.h utils.h error_handle.h
+test_tensor.o: test_tensor.c tensor.h tensor_view.h tensor_broadcast.h tensor_ops.h utils.h error_handle.h
 	$(CC) $(CFLAGS) -c test_tensor.c -o test_tensor.o
 
 clean:

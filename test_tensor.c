@@ -1,5 +1,6 @@
 #include "tensor.h"
 #include "tensor_broadcast.h"
+#include "tensor_ops.h"
 #include "tensor_view.h"
 
 #include <assert.h>
@@ -265,6 +266,120 @@ static void test_broadcast_shape_and_strides(void) {
     print_test_passed("broadcast shape and strides");
 }
 
+static void assert_tensor_values(const Tensor *tensor, const float *expected,
+                                 size_t count) {
+    assert(tensor != NULL);
+    assert(tensor->nelements == count);
+    for (size_t i = 0U; i < count; ++i) {
+        assert(tensor->storage->data[i] == expected[i]);
+    }
+}
+
+static void test_elementwise_tensor_operations(void) {
+    const size_t shape[] = {2U, 2U};
+    Tensor *a = tensor_from_data(shape, 2U,
+                                 (const float[]){8.0f, 12.0f, 16.0f, 20.0f});
+    Tensor *b = tensor_from_data(shape, 2U,
+                                 (const float[]){2.0f, 3.0f, 4.0f, 5.0f});
+    Tensor *sum;
+    Tensor *difference;
+    Tensor *product;
+    Tensor *quotient;
+
+    assert(a != NULL && b != NULL);
+    sum = tensor_add(a, b);
+    difference = tensor_sub(a, b);
+    product = tensor_mul(a, b);
+    quotient = tensor_div(a, b);
+
+    assert_tensor_values(sum, (const float[]){10.0f, 15.0f, 20.0f, 25.0f}, 4U);
+    assert_tensor_values(difference, (const float[]){6.0f, 9.0f, 12.0f, 15.0f}, 4U);
+    assert_tensor_values(product, (const float[]){16.0f, 36.0f, 64.0f, 100.0f}, 4U);
+    assert_tensor_values(quotient, (const float[]){4.0f, 4.0f, 4.0f, 4.0f}, 4U);
+
+    assert(destroy_tensor(quotient) == SUCCESS);
+    assert(destroy_tensor(product) == SUCCESS);
+    assert(destroy_tensor(difference) == SUCCESS);
+    assert(destroy_tensor(sum) == SUCCESS);
+    assert(destroy_tensor(b) == SUCCESS);
+    assert(destroy_tensor(a) == SUCCESS);
+    print_test_passed("element-wise add, sub, mul, and div");
+}
+
+static void test_tensor_operations_broadcast_and_views(void) {
+    const size_t matrix_shape[] = {2U, 3U};
+    const size_t vector_shape[] = {3U};
+    const size_t reverse_shape[] = {4U};
+    const ptrdiff_t reverse_stride[] = {-1};
+    const size_t scalar_shape[] = {1U};
+    Tensor *matrix = tensor_from_data(matrix_shape, 2U,
+                                      (const float[]){1.0f, 2.0f, 3.0f,
+                                                      4.0f, 5.0f, 6.0f});
+    Tensor *vector = tensor_from_data(vector_shape, 1U,
+                                      (const float[]){10.0f, 20.0f, 30.0f});
+    Tensor *base = tensor_from_data(reverse_shape, 1U,
+                                    (const float[]){1.0f, 2.0f, 3.0f, 4.0f});
+    Tensor *reverse;
+    Tensor *scalar = init_tensor(scalar_shape, 1U, 10.0f);
+    Tensor *broadcast_sum;
+    Tensor *view_sum;
+
+    assert(matrix != NULL && vector != NULL && base != NULL && scalar != NULL);
+    broadcast_sum = tensor_add(matrix, vector);
+    assert(broadcast_sum != NULL);
+    assert(broadcast_sum->nidims == 2U);
+    assert(broadcast_sum->shape[0] == 2U && broadcast_sum->shape[1] == 3U);
+    assert_tensor_values(broadcast_sum,
+                         (const float[]){11.0f, 22.0f, 33.0f,
+                                         14.0f, 25.0f, 36.0f}, 6U);
+
+    reverse = tensor_create_view(base->storage, 3U, reverse_shape,
+                                 reverse_stride, 1U);
+    assert(reverse != NULL);
+    view_sum = tensor_add(reverse, scalar);
+    assert_tensor_values(view_sum, (const float[]){14.0f, 13.0f, 12.0f, 11.0f}, 4U);
+
+    assert(destroy_tensor(view_sum) == SUCCESS);
+    assert(destroy_tensor(reverse) == SUCCESS);
+    assert(destroy_tensor(broadcast_sum) == SUCCESS);
+    assert(destroy_tensor(scalar) == SUCCESS);
+    assert(destroy_tensor(base) == SUCCESS);
+    assert(destroy_tensor(vector) == SUCCESS);
+    assert(destroy_tensor(matrix) == SUCCESS);
+    print_test_passed("tensor operations support broadcasting and strided views");
+}
+
+static void test_tensor_operations_reject_invalid_inputs(void) {
+    const size_t a_shape[] = {2U, 3U};
+    const size_t b_shape[] = {2U, 2U};
+    Tensor *a = create_tensor(a_shape, 2U);
+    Tensor *b = create_tensor(b_shape, 2U);
+
+    assert(a != NULL && b != NULL);
+    assert(tensor_add(a, b) == NULL);
+    assert(tensor_add(NULL, b) == NULL);
+    assert(tensor_binary_op(a, a, (TensorOp)99) == NULL);
+    assert(destroy_tensor(b) == SUCCESS);
+    assert(destroy_tensor(a) == SUCCESS);
+    print_test_passed("tensor operations reject invalid inputs");
+}
+
+static void test_tensor_operations_with_dynamic_metadata(void) {
+    const size_t shape[] = {1U, 1U, 1U, 1U, 1U, 1U, 2U};
+    Tensor *a = tensor_from_data(shape, 7U, (const float[]){1.0f, 2.0f});
+    Tensor *b = tensor_from_data(shape, 7U, (const float[]){10.0f, 20.0f});
+    Tensor *sum;
+
+    assert(a != NULL && b != NULL);
+    sum = tensor_add(a, b);
+    assert(sum != NULL && sum->nidims == 7U);
+    assert_tensor_values(sum, (const float[]){11.0f, 22.0f}, 2U);
+    assert(destroy_tensor(sum) == SUCCESS);
+    assert(destroy_tensor(b) == SUCCESS);
+    assert(destroy_tensor(a) == SUCCESS);
+    print_test_passed("tensor operations handle dynamic metadata");
+}
+
 static double elapsed_milliseconds(clock_t start, clock_t end) {
     return ((double)(end - start) * 1000.0) / (double)CLOCKS_PER_SEC;
 }
@@ -344,6 +459,10 @@ int main(void) {
     test_reshape_creates_contiguous_zero_copy_view();
     test_slice_creates_strided_zero_copy_view();
     test_broadcast_shape_and_strides();
+    test_elementwise_tensor_operations();
+    test_tensor_operations_broadcast_and_views();
+    test_tensor_operations_reject_invalid_inputs();
+    test_tensor_operations_with_dynamic_metadata();
     demo_live_tensor_workflow();
     printf("All tests passed\n");
     return 0;

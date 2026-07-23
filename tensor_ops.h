@@ -1,17 +1,22 @@
-#include "tensor.h"
-#include "tensor_broadcast.h"
+#ifndef TENSOR_OPS_H
+#define TENSOR_OPS_H
 
-#include <stdlib.h>
-#include <string.h>
+#include "tensor.h"
+
 typedef enum {
-    ADD,
-    SUB,
-    MUL,
-    DIV
+    TENSOR_OP_ADD,
+    TENSOR_OP_SUB,
+    TENSOR_OP_MUL,
+    TENSOR_OP_DIV
 } TensorOp;
 
-Tensor *tensor_add(Tensor *tensor_a, Tensor *tensor_b);
-Tensor *tensor_sub(Tensor *tensor_a, Tensor *tensor_b);
-Tensor *tensor_mul(Tensor *tensor_a, Tensor *tensor_b);
-Tensor *tensor_div(Tensor *tensor_a, Tensor *tensor_b);
-Tensor *tensor_binary_op(Tensor *tensor_a, Tensor *tensor_b, TensorOp op);
+/* Return a newly allocated tensor after applying an element-wise operation.
+ * Input tensors are broadcast using NumPy-style trailing-dimension rules. */
+Tensor *tensor_add(const Tensor *tensor_a, const Tensor *tensor_b);
+Tensor *tensor_sub(const Tensor *tensor_a, const Tensor *tensor_b);
+Tensor *tensor_mul(const Tensor *tensor_a, const Tensor *tensor_b);
+Tensor *tensor_div(const Tensor *tensor_a, const Tensor *tensor_b);
+Tensor *tensor_binary_op(const Tensor *tensor_a, const Tensor *tensor_b,
+                         TensorOp op);
+
+#endif
